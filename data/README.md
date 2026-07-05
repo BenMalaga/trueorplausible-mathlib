@@ -77,5 +77,5 @@ huggingface-cli download l3lab/miniCTX minictx-test/mathlib.jsonl \
 
 ## Prior-art dataset to engage (NOT a statement source): `INSAIT-Institute/BrokenMath`
 
-10K–100K rows, CC-BY-NC-SA-4.0. Natural-language competition theorems perturbed to
+10K-100K rows, CC-BY-NC-SA-4.0. Natural-language competition theorems perturbed to
 false. We cite/contrast it (the closest sibling), do NOT redistribute (NC-SA).
