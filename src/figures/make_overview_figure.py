@@ -59,7 +59,7 @@ TAXONOMY = [
     ("A", "F", "A1", "negate the conclusion", "P", "¬ (P)"),
     ("A", "F", "A2", "quantifier negation", "∀ x, P x", "∃ x, ¬ P x"),
     ("A", "M", "A3", "complementary relation", "a = b", "a ≠ b"),
-    ("B", "N", "B1", "drop a hypothesis", "(h : 0<n) … P", "… P"),
+    ("B", "N", "B1", "drop a hypothesis", "(h : 0<n) ... P", "... P"),
     ("B", "N", "B2", "strict ↔ non-strict", "a < b", "a ≤ b"),
     ("B", "N", "B3", "off-by-one literal", "n", "n+1"),
 ]

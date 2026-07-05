@@ -28,7 +28,7 @@ falsifying by construction (Family A) or are machine-verified false (Family B).
 - **H1: discrimination.** At least one model in the locked roster (§6) achieves pooled
   AUROC **> 0.60** on the primary (Family-A) benchmark, with the one-sided 95% bootstrap
   lower confidence bound **> 0.50**. Null: prompted veracity judgment is at chance
-  (AUROC = 0.5). Per-model tests are Holm–Bonferroni corrected across the roster (m = 5).
+  (AUROC = 0.5). Per-model tests are Holm-Bonferroni corrected across the roster (m = 5).
 - **H2: tier collapse.** For each model, AUROC decreases as the perturbation gets
   surface-subtler: AUROC(Tier F) > AUROC(Tier M) > AUROC(Tier N). **Primary contrast:**
   AUROC(Tier F) − AUROC(Tier M) **> 0.05** with one-sided 95% bootstrap lower bound > 0
@@ -127,7 +127,7 @@ false).
    excluded (logged). Residual length deltas are reported, and H4's surface baseline is the
    binding control.
 
-**Held-out recency probe (exploratory, not part of H1–H4):** miniCTX-v2 statements created
+**Held-out recency probe (exploratory, not part of H1-H4):** miniCTX-v2 statements created
 after 2024-11-28 (≤ 100), run through the same mutation pipeline, to contrast performance
 on likely-in-pretraining vs post-cutoff statements.
 
@@ -158,7 +158,7 @@ Answer:
 - **Primary confidence score:** normalized next-token probability
   `P(True) / (P(True) + P(False))` read from the log-probabilities at the answer position
   (the token-id sets covering each surface form are recorded in the harness config).
-- **Secondary (exploratory):** verbalized 0–100 confidence elicited in a separate prompt.
+- **Secondary (exploratory):** verbalized 0-100 confidence elicited in a separate prompt.
 - Hosted-API models without token log-probabilities use the verbalized score and are
   analyzed separately (different elicitation; never pooled with the primary cohort).
 
@@ -195,7 +195,7 @@ from out-of-fold predictions.
 - **Calibration:** ECE (10 equal-mass bins), Brier score, reliability diagrams.
 - **Uncertainty:** cluster bootstrap resampling **source theorems** (pairs stay together),
   **n_boot = 2,000**, seed 20260611; 95% percentile intervals.
-- **Multiple comparisons:** H1 Holm–Bonferroni across the 5 local models; H2/H3 are
+- **Multiple comparisons:** H1 Holm-Bonferroni across the 5 local models; H2/H3 are
   per-model descriptions with CIs; H4 tests only the single best model (selected by pooled
   AUROC) against the baseline.
 - Items where a model emits neither `True` nor `False` in the answer position are scored as
@@ -206,7 +206,7 @@ from out-of-fold predictions.
 1. Build the statement pool and mutant set; freeze and hash the benchmark file.
 2. Run the surface baseline (§7) on the frozen set.
 3. Run the local cohort (§6) with the frozen prompt (§5).
-4. Compute pre-registered tests H1–H4; only then any exploratory analyses (so labeled).
+4. Compute pre-registered tests H1-H4; only then any exploratory analyses (so labeled).
 
 ## 10. Ethics and footprint
 
@@ -242,4 +242,4 @@ record it explicitly: the scaler is **included**. Rationale: unscaled features (
 lengths vs. binary flags) make an L2 penalty at fixed C unit-dependent and arbitrary;
 standardization is the standard-practice reading. This choice is conservative with respect to
 H4, it strengthens the baseline, making H4's ≥0.05 margin *harder* to achieve. Recorded
-before any model has been queried on any benchmark item; H1–H4 thresholds unchanged.
+before any model has been queried on any benchmark item; H1-H4 thresholds unchanged.

@@ -1,4 +1,4 @@
-"""Scoring for TrueOrPlausible, the pre-registered metrics, exactly as locked (§7–§8).
+"""Scoring for TrueOrPlausible, the pre-registered metrics, exactly as locked (§7-§8).
 
 Implements:
   - AUROC (tie-aware, rank-based), pooled, per tier, per model
@@ -8,7 +8,7 @@ Implements:
     5-fold group-stratified CV grouped by source theorem; AUROC from out-of-fold scores)
   - cluster bootstrap resampling SOURCE THEOREMS (pairs stay together),
     n_boot = 2,000, seed 20260611, 95% percentile intervals (+ one-sided lower bounds)
-  - Holm–Bonferroni correction across the locked roster (m = 5) for H1
+  - Holm-Bonferroni correction across the locked roster (m = 5) for H1
   - abstention protocol: items answering neither True nor False are excluded from the
     metrics and the abstention rate is reported (never silently dropped)
 
@@ -26,12 +26,12 @@ import numpy as np
 
 from .mutate import MutationError, explicit_binder_groups, split_signature
 
-# --- Registered constants (PRE_REGISTRATION.md §7–§8) ----------------------------------------
+# --- Registered constants (PRE_REGISTRATION.md §7-§8) ----------------------------------------
 
 N_BOOT = 2000
 BOOT_SEED = 20260611
 ECE_BINS = 10
-ROSTER_SIZE = 5            # Holm–Bonferroni m for H1
+ROSTER_SIZE = 5            # Holm-Bonferroni m for H1
 BASELINE_C = 1.0           # logistic-regression L2 strength (sklearn C)
 BASELINE_FOLDS = 5
 SURFACE_SYMBOLS = list("∀∃¬≠≤<≥>=∈∉→↔∧∨")   # §7 symbol-count features
@@ -40,7 +40,7 @@ SURFACE_SYMBOLS = list("∀∃¬≠≤<≥>=∈∉→↔∧∨")   # §7 symbol-
 # --- Core metrics ------------------------------------------------------------------------------
 
 def auroc(y_true, score) -> float:
-    """Tie-aware AUROC via the rank (Mann–Whitney) statistic."""
+    """Tie-aware AUROC via the rank (Mann-Whitney) statistic."""
     y = np.asarray(y_true, dtype=float)
     s = np.asarray(score, dtype=float)
     n_pos, n_neg = int(y.sum()), int((1 - y).sum())
@@ -139,7 +139,7 @@ def bootstrap_p_leq_null(samples, null_value: float) -> float:
 
 
 def holm_bonferroni(pvals: dict, alpha: float = 0.05) -> dict:
-    """Holm–Bonferroni step-down correction. Returns {name: (p_adjusted, reject)}."""
+    """Holm-Bonferroni step-down correction. Returns {name: (p_adjusted, reject)}."""
     items = sorted(pvals.items(), key=lambda kv: kv[1])
     m = len(items)
     out, running_max, still_rejecting = {}, 0.0, True

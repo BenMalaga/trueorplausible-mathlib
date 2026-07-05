@@ -83,7 +83,7 @@ def _sha256_file(path: Path) -> str:
 
 
 def load_pool(pool_path: Path):
-    """Steps 1–2: read rows in file order; first row per declId; drop duplicate decl texts.
+    """Steps 1-2: read rows in file order; first row per declId; drop duplicate decl texts.
 
     Returns (pool, log) where pool is a list of (declId, decl) and log counts every drop.
     """
@@ -202,7 +202,7 @@ def build(pool_path: Path = DEFAULT_POOL,
     log["mutants_failing_static_checks"] = static_failures
     log["mutants_generated"] = len(mutants)
 
-    # Steps 6–7, pair with the unmodified source (50/50) + length control.
+    # Steps 6-7, pair with the unmodified source (50/50) + length control.
     items = []
     length_excluded = 0
     tier_counts: Counter = Counter()

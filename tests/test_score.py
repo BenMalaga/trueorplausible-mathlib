@@ -169,7 +169,7 @@ def test_bootstrap_pvalue():
     assert bootstrap_p_leq_null(np.full(99, 0.0), 0.5) == 1.0
 
 
-# --- Holm–Bonferroni ------------------------------------------------------------------------------
+# --- Holm-Bonferroni ------------------------------------------------------------------------------
 
 def test_holm_bonferroni_known_example():
     out = holm_bonferroni({"a": 0.01, "b": 0.04, "c": 0.03, "d": 0.005}, alpha=0.05)
