@@ -1,0 +1,15 @@
+# Pinned dependencies (Python 3.14.2, macOS arm64).
+datasets==5.0.0
+huggingface_hub==1.18.0
+numpy==2.4.6
+pandas==3.0.3
+scipy==1.17.1
+scikit-learn==1.7.2   # AUROC, calibration curves, surface-feature baseline
+matplotlib==3.11.0    # overview figure (src/figures/make_overview_figure.py)
+tqdm==4.68.2
+pytest==9.0.3
+# Local inference: llama.cpp built from source with CMAKE_ARGS="-DGGML_METAL=on"
+# (no prebuilt wheel for py3.14; binary NOT portable, rebuild on target machine).
+llama_cpp_python==0.3.28
+# Lean (B)-pass only, NOT a pip dep: install elan + `lake exe cache get` for precompiled
+# mathlib oleans. Do NOT plan a from-scratch mathlib build on 8GB (PRE_REGISTRATION.md §3).

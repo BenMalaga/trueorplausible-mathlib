@@ -1,0 +1,54 @@
+# Data (keep raw data out of git; document access in data/README.md)
+data/*
+!data/.gitkeep
+!data/README.md
+
+# Raw per-item eval outputs: large, and hold embargoed outcome data until analysis.
+# Only small committed outputs (metrics tables, figures, released pair-sets) belong in results/.
+results/raw/
+*.h5
+*.hdf5
+*.nc
+*.parquet
+*.jsonl.gz
+*.gz
+*.zip
+checkpoints/
+models/
+*.pt
+*.safetensors
+*.gguf
+
+# Lean build artifacts (if a local verification pass is ever run)
+.lake/
+lake-packages/
+build/
+*.olean
+*.ilean
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+.python-version
+*.egg-info/
+dist/
+
+# Secrets / env
+.env
+.env.*
+secrets.*
+*.key
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Internal working docs, NEVER published
+_internal/
+CLAUDE.md
+PRE_REGISTRATION_DRAFT.md

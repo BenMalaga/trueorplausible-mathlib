@@ -1,0 +1,74 @@
+{
+  "benchmark_version": "v1.0",
+  "built_utc": "2026-06-12T14:30:23+00:00",
+  "preregistration": "PRE_REGISTRATION.md (locked 2026-06-11)",
+  "seed": 20260611,
+  "n_source_theorems_registered": 1200,
+  "source_dataset": {
+    "repo_id": "l3lab/ntp-mathlib",
+    "filename": "Mathlib/tactic_prediction.jsonl",
+    "hf_revision": "03b2ea6c3cf0a55203596445722ebb61c2328889",
+    "mathlib_src_commit": "cf8e23a62939ed7cc530fbb68e83539730f32f86",
+    "pool_extraction": {
+      "source_repo": "l3lab/ntp-mathlib",
+      "source_filename": "Mathlib/tactic_prediction.jsonl",
+      "source_revision": "03b2ea6c3cf0a55203596445722ebb61c2328889",
+      "mathlib_src_commit": "cf8e23a62939ed7cc530fbb68e83539730f32f86",
+      "source_bytes_read": 7806138228,
+      "rows_read": 307049,
+      "rows_written": 307049,
+      "parse_fallbacks": 307049,
+      "pool_sha256": "66fe15c2f947481f18f84308720e4a3e7d7c81c6eeb399f8f21d9173646a062e",
+      "fields_kept": [
+        "declId",
+        "decl"
+      ]
+    }
+  },
+  "pipeline_log": {
+    "rows_read": 307049,
+    "dropped_duplicate_declId": 244290,
+    "unique_declIds": 62759,
+    "dropped_duplicate_decl_text": 1438,
+    "pool_after_dedupe": 61321,
+    "proof_body_stripped": 0,
+    "excluded_by_reason": {
+      "not_theorem_or_lemma": 32361,
+      "over_600_chars": 25,
+      "over_12_lines": 4
+    },
+    "pool_after_filters": 28931,
+    "sampled_source_theorems": 1200,
+    "sources_with_no_applicable_operator": 11,
+    "mutants_failing_static_checks": 0,
+    "mutants_generated": 2198,
+    "pairs_excluded_by_length_control": 261,
+    "pairs_final": 1937,
+    "items_final": 3874
+  },
+  "pairs_per_tier": {
+    "F": 1025,
+    "M": 521,
+    "N": 391
+  },
+  "tier_target_at_least_300_met": {
+    "F": true,
+    "M": true,
+    "N": true
+  },
+  "mutants_per_operator": {
+    "B1": 340,
+    "A1": 994,
+    "A3": 521,
+    "B2": 168,
+    "B3": 144,
+    "A2": 31
+  },
+  "primary_set_pairs_family_A": 1546,
+  "family_B_pairs_pending_lean_verification": 391,
+  "verification_note": "Family-A mutants are false by construction (hypothesis-satisfiability assumption stated in PRE_REGISTRATION.md §3). Family-B mutants carry verification_status=pending_lean_verification and are EXCLUDED from the primary set until a one-time Lean pass confirms falsity; per the pre-registered fallback, v1 ships Family A only if that pass never runs.",
+  "benchmark_file": "data/benchmark/trueorplausible_v1.0.jsonl",
+  "benchmark_sha256": "4b7ad634b714d2f6948990035e66ae54a0aabc7c01173aa9cd1b52000c7668a1",
+  "content_hash_sha256": "ede17d03265c64460978719ffbb2da4eb97bc80c9fed15cddf2153709e60eace",
+  "release_note": "The benchmark JSONL is git-ignored and ships (Zenodo/HF, Apache-2.0 with Mathlib4 attribution) only at the SHIP phase, after the embargoed model runs; this manifest is the committed, hash-locked record of its content."
+}

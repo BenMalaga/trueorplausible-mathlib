@@ -1,0 +1,331 @@
+"""Benchmark builder for TrueOrPlausible, PRE_REGISTRATION.md §4, implemented verbatim.
+
+Pool construction (idempotent, logged; every cap/drop/exclusion is counted, no silent
+scope cuts):
+  1. read (declId, decl) from the pinned `l3lab/ntp-mathlib` revision (src.fetch_data --pool)
+  2. dedupe: first row per declId, then drop exact-duplicate decl texts
+  3. filter to genuine statements (theorem/lemma regex; no `sorry`; no auto-generated
+     declIds; ≤ 600 chars; ≤ 12 lines)
+  4. sample N = 1,200 source theorems uniformly without replacement,
+     seed 20260611 (numpy.random.default_rng(20260611))
+  5. per sampled theorem: enumerate applicable operators (fixed order), keep at most 2
+     mutants (uniform choice among applicable operators, SAME RNG stream)
+  6. pair each included mutant with its unmodified source (label true) → exact 50/50
+  7. length control: drop pairs with |whitespace-token-count difference| > 5 (logged)
+
+Output:
+  - data/benchmark/trueorplausible_v1.jsonl   (gitignored, the released dataset ships
+    only at the SHIP phase, after model runs; see PRE_REGISTRATION.md §4/§9)
+  - results/benchmark_manifest.json           (committed: content hashes, pinned source
+    revisions, the full exclusion log, per-tier/operator counts, no statement text)
+
+Usage:
+    python -m src.build_benchmark            # requires the extracted pool (--pool fetch)
+    python -m src.build_benchmark --pool PATH --out PATH --manifest PATH   # for tests
+
+NOTE: the single registered RNG stream (seed 20260611) is consumed in one fixed,
+documented order: (a) the N-sample, then (b) per sampled theorem in sampled order,
+operator choice followed by any operator-internal site choices. Re-running the builder
+on the same pool file reproduces the benchmark byte-for-byte.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+from collections import Counter
+from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
+
+from . import fetch_data
+from .mutate import (
+    FAMILY_OF,
+    TIER_OF,
+    applicable_operators,
+    apply_operator,
+    strip_proof_assign,
+)
+
+ROOT = Path(__file__).resolve().parent.parent
+
+BENCHMARK_VERSION = "v1.0"
+SEED = 20260611
+N_SOURCE_THEOREMS = 1200
+MAX_MUTANTS_PER_SOURCE = 2
+MAX_CHARS = 600
+MAX_LINES = 12
+LENGTH_CONTROL_MAX_WS_TOKEN_DIFF = 5
+
+STATEMENT_RE = re.compile(r"^\s*(theorem|lemma)\s")
+AUTOGEN_DECLID_MARKERS = [
+    "_sizeOf", "_simp", ".mk.", ".rec", ".casesOn", ".noConfusion", "eq_def", "proof_",
+]
+
+DEFAULT_POOL = fetch_data.NTP_POOL_FILE
+DEFAULT_OUT = ROOT / "data" / "benchmark" / f"trueorplausible_{BENCHMARK_VERSION}.jsonl"
+DEFAULT_MANIFEST = ROOT / "results" / "benchmark_manifest.json"
+
+
+def ws_tokens(s: str) -> int:
+    return len(s.split())
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def load_pool(pool_path: Path):
+    """Steps 1–2: read rows in file order; first row per declId; drop duplicate decl texts.
+
+    Returns (pool, log) where pool is a list of (declId, decl) and log counts every drop.
+    """
+    by_id: dict[str, str] = {}
+    rows_read = dup_declid = 0
+    with open(pool_path, encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            rows_read += 1
+            row = json.loads(line)
+            decl_id, decl = row["declId"], row["decl"]
+            if decl_id in by_id:
+                dup_declid += 1
+                continue
+            by_id[decl_id] = decl
+    seen_texts: set[str] = set()
+    pool: list[tuple[str, str]] = []
+    dup_text = 0
+    for decl_id, decl in by_id.items():  # insertion order == file order
+        if decl in seen_texts:
+            dup_text += 1
+            continue
+        seen_texts.add(decl)
+        pool.append((decl_id, decl))
+    log = {
+        "rows_read": rows_read,
+        "dropped_duplicate_declId": dup_declid,
+        "unique_declIds": len(by_id),
+        "dropped_duplicate_decl_text": dup_text,
+        "pool_after_dedupe": len(pool),
+    }
+    return pool, log
+
+
+def filter_pool(pool):
+    """Step 3 filters, exactly as registered. Counts the FIRST matching exclusion reason
+    per row (fixed reason order) plus how many rows had a proof body stripped."""
+    kept = []
+    reasons = Counter()
+    proof_stripped = 0
+    for decl_id, decl in pool:
+        stripped = strip_proof_assign(decl)
+        if stripped != decl:
+            proof_stripped += 1
+        decl = stripped
+        if not STATEMENT_RE.match(decl):
+            reasons["not_theorem_or_lemma"] += 1
+            continue
+        if "sorry" in decl:
+            reasons["contains_sorry"] += 1
+            continue
+        if any(m in decl_id for m in AUTOGEN_DECLID_MARKERS):
+            reasons["autogenerated_declId"] += 1
+            continue
+        if len(decl) > MAX_CHARS:
+            reasons["over_600_chars"] += 1
+            continue
+        if len(decl.splitlines()) > MAX_LINES:
+            reasons["over_12_lines"] += 1
+            continue
+        kept.append((decl_id, decl))
+    log = {
+        "proof_body_stripped": proof_stripped,
+        "excluded_by_reason": dict(reasons),
+        "pool_after_filters": len(kept),
+    }
+    return kept, log
+
+
+def build(pool_path: Path = DEFAULT_POOL,
+          out_path: Path = DEFAULT_OUT,
+          manifest_path: Path = DEFAULT_MANIFEST,
+          n_source: int = N_SOURCE_THEOREMS,
+          seed: int = SEED) -> dict:
+    """Run the full registered pipeline; write the benchmark JSONL + committed manifest."""
+    rng = np.random.default_rng(seed)
+    log: dict = {}
+
+    pool, log_load = load_pool(pool_path)
+    pool, log_filter = filter_pool(pool)
+    log.update(log_load)
+    log.update(log_filter)
+
+    # Step 4, uniform sample without replacement, registered seed.
+    if len(pool) <= n_source:
+        sampled_idx = np.arange(len(pool))
+        log["sample_note"] = (
+            f"pool ({len(pool)}) <= N ({n_source}): took the whole pool (logged, not silent)"
+        )
+    else:
+        sampled_idx = rng.choice(len(pool), size=n_source, replace=False)
+    sampled = [pool[int(i)] for i in sampled_idx]
+    log["sampled_source_theorems"] = len(sampled)
+
+    # Step 5, mutants: at most 2 per source, uniform among applicable ops, same stream.
+    mutants = []
+    no_applicable = static_failures = 0
+    op_counts: Counter = Counter()
+    for decl_id, decl in sampled:
+        ops = applicable_operators(decl)
+        if not ops:
+            no_applicable += 1
+            continue
+        k = min(MAX_MUTANTS_PER_SOURCE, len(ops))
+        chosen_idx = rng.choice(len(ops), size=k, replace=False)
+        for j in chosen_idx:
+            op = ops[int(j)]
+            m = apply_operator(op, decl, decl_id, rng)
+            if not m.static_checks_passed:
+                static_failures += 1
+                continue
+            mutants.append(m)
+            op_counts[op] += 1
+    log["sources_with_no_applicable_operator"] = no_applicable
+    log["mutants_failing_static_checks"] = static_failures
+    log["mutants_generated"] = len(mutants)
+
+    # Steps 6–7, pair with the unmodified source (50/50) + length control.
+    items = []
+    length_excluded = 0
+    tier_counts: Counter = Counter()
+    for m in mutants:
+        t_true, t_false = ws_tokens(m.source_statement), ws_tokens(m.mutant_statement)
+        if abs(t_true - t_false) > LENGTH_CONTROL_MAX_WS_TOKEN_DIFF:
+            length_excluded += 1
+            continue
+        pair_id = f"{m.source_decl_id}#{m.operator}"
+        primary = m.family == "A"
+        common = {
+            "pair_id": pair_id,
+            "source_decl_id": m.source_decl_id,
+            "operator": m.operator,
+            "family": m.family,
+            "tier": m.tier,
+            "primary_set": primary,
+        }
+        items.append({
+            "item_id": f"{pair_id}::true",
+            "statement": m.source_statement,
+            "label": "true",
+            "verification_status": "library_proved",
+            "edit": None,
+            "ws_token_count": t_true,
+            "char_count": len(m.source_statement),
+            **common,
+        })
+        items.append({
+            "item_id": f"{pair_id}::false",
+            "statement": m.mutant_statement,
+            "label": "false",
+            "verification_status": m.verification_status,
+            "edit": m.edit,
+            "ws_token_count": t_false,
+            "char_count": len(m.mutant_statement),
+            **common,
+        })
+        tier_counts[m.tier] += 1
+    log["pairs_excluded_by_length_control"] = length_excluded
+    log["pairs_final"] = len(items) // 2
+    log["items_final"] = len(items)
+
+    # Write the benchmark file (gitignored until the SHIP phase).
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        for it in items:
+            f.write(json.dumps(it, ensure_ascii=False) + "\n")
+
+    # Canonical content hash, robust to JSON formatting: over (item_id, statement, label).
+    canon = hashlib.sha256()
+    for it in items:
+        canon.update(
+            json.dumps([it["item_id"], it["statement"], it["label"]],
+                       ensure_ascii=False).encode("utf-8")
+        )
+
+    pool_meta = {}
+    if fetch_data.NTP_POOL_META.exists() and pool_path == fetch_data.NTP_POOL_FILE:
+        pool_meta = json.loads(fetch_data.NTP_POOL_META.read_text())
+
+    manifest = {
+        "benchmark_version": BENCHMARK_VERSION,
+        "built_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "preregistration": "PRE_REGISTRATION.md (locked 2026-06-11)",
+        "seed": seed,
+        "n_source_theorems_registered": n_source,
+        "source_dataset": {
+            "repo_id": fetch_data.NTP_MATHLIB["repo_id"],
+            "filename": fetch_data.NTP_MATHLIB["filename"],
+            "hf_revision": fetch_data.NTP_MATHLIB["revision"],
+            "mathlib_src_commit": fetch_data.NTP_MATHLIB["mathlib_src_commit"],
+            "pool_extraction": pool_meta,
+        },
+        "pipeline_log": log,
+        "pairs_per_tier": dict(tier_counts),
+        "tier_target_at_least_300_met": {
+            t: tier_counts.get(t, 0) >= 300 for t in ("F", "M", "N")
+        },
+        "mutants_per_operator": dict(op_counts),
+        "primary_set_pairs_family_A": sum(
+            tier_counts[t] for t in ("F", "M") if t in tier_counts
+        ),
+        "family_B_pairs_pending_lean_verification": tier_counts.get("N", 0),
+        "verification_note": (
+            "Family-A mutants are false by construction (hypothesis-satisfiability "
+            "assumption stated in PRE_REGISTRATION.md §3). Family-B mutants carry "
+            "verification_status=pending_lean_verification and are EXCLUDED from the "
+            "primary set until a one-time Lean pass confirms falsity; per the "
+            "pre-registered fallback, v1 ships Family A only if that pass never runs."
+        ),
+        "benchmark_file": str(out_path.relative_to(ROOT)) if out_path.is_relative_to(ROOT) else str(out_path),
+        "benchmark_sha256": _sha256_file(out_path),
+        "content_hash_sha256": canon.hexdigest(),
+        "release_note": (
+            "The benchmark JSONL is git-ignored and ships (Zenodo/HF, Apache-2.0 with "
+            "Mathlib4 attribution) only at the SHIP phase, after the embargoed model "
+            "runs; this manifest is the committed, hash-locked record of its content."
+        ),
+    }
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
+    print(f"[build] {len(items)} items ({len(items)//2} pairs) -> {out_path}")
+    print(f"[build] pairs per tier: {dict(tier_counts)}  ops: {dict(op_counts)}")
+    print(f"[build] manifest -> {manifest_path}")
+    return manifest
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--pool", type=Path, default=DEFAULT_POOL)
+    ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    ap.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    ap.add_argument("--n", type=int, default=N_SOURCE_THEOREMS)
+    ap.add_argument("--seed", type=int, default=SEED)
+    args = ap.parse_args()
+    if not args.pool.exists():
+        raise SystemExit(
+            f"pool file not found: {args.pool}\n"
+            "run `python -m src.fetch_data --pool` first (streams the pinned revision)"
+        )
+    build(args.pool, args.out, args.manifest, n_source=args.n, seed=args.seed)
+
+
+if __name__ == "__main__":
+    main()
